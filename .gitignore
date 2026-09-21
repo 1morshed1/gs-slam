@@ -1,0 +1,15 @@
+# data + outputs — never commit (tens–hundreds of GiB, plan §4A disk pressure)
+datasets/
+datasets_corrupted/
+runs/
+store/*.sqlite
+store/*.parquet
+*.npz
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/

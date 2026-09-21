@@ -1,0 +1,32 @@
+[project]
+name = "edge-slam-benchmark"
+version = "0.1.0"
+description = "Energy + robustness benchmark harness for edge visual SLAM (classical / GS / GFM)"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# rig-runnable extras (corruption generation, eval, analysis)
+rig = [
+    "opencv-python-headless>=4.8",
+    "pillow>=10.0",
+    "evo>=1.28",            # ATE/RPE
+    "scikit-image>=0.22",   # SSIM
+    "lpips>=0.1.4",         # LPIPS
+    "pandas>=2.0",
+    "pyarrow>=14.0",        # parquet export
+]
+dev = ["pytest>=7.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["harness*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

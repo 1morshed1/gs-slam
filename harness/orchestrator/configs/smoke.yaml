@@ -1,0 +1,26 @@
+# Smoke config: smallest matrix that exercises the whole pipeline on the office rig.
+# One classical system, one RGB-D sequence, three corruptions at coarse severity.
+# Fill dataset paths once loaders land (plan §5). hardware_tier=office_rig → nvidia-smi
+# (coarse GPU-only context, NOT edge energy — see plan §4A).
+
+hardware_tier: office_rig
+
+systems:
+  - orb_slam3
+
+# (dataset, sequence, modality)
+sequences:
+  - [tum, rgbd_dataset_freiburg1_desk, rgbd]
+
+corruptions:
+  - gaussian-noise
+  - jpeg-compression
+  - defocus-blur
+
+severities: [1, 3, 5]        # coarse grid
+fine_severities: [1, 2, 3, 4, 5]
+fine_subset_systems: []      # none get the fine grid in the smoke test
+
+repeats: 2
+power_modes: [default]
+include_clean_control: true
