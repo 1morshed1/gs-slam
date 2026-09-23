@@ -1,11 +1,9 @@
 """Concrete corruption generators (plan §6).
 
-Three are implemented for real (rig-runnable today, no SLAM deps): gaussian-noise,
-jpeg-compression, defocus-blur. The rest are declared stubs with their sev1→5
-parameter ranges filled in so the filler only writes the kernel, not the design.
+Implemented: gaussian-noise, jpeg-compression, defocus-blur, motion-blur, low-light,
+exposure-change, dynamic-objects. frame-drop is stream-level (see pregenerate).
 
-Deps: numpy (+ optional cv2/Pillow for a couple). Kept minimal so this module runs on
-the office rig immediately for corrupted-dataset pre-generation.
+Deps: numpy (+ optional cv2/Pillow). Import never hard-fails without imaging backends.
 """
 
 from __future__ import annotations
@@ -15,7 +13,6 @@ import numpy as np
 
 from .base import Corruption, register
 
-# Optional imaging backends — degrade gracefully so import never hard-fails.
 try:
     import cv2  # type: ignore
     _HAVE_CV2 = True
@@ -33,11 +30,11 @@ def _clip8(x: np.ndarray) -> np.ndarray:
     return np.clip(x, 0, 255).astype(np.uint8)
 
 
-# --- Implemented ------------------------------------------------------------
+# --- Photometric / blur -----------------------------------------------------
 @register
 class GaussianNoise(Corruption):
     name = "gaussian-noise"
-    _SIGMA = {1: 5, 2: 12, 3: 22, 4: 38, 5: 60}  # per-channel std, 0..255 scale
+    _SIGMA = {1: 5, 2: 12, 3: 22, 4: 38, 5: 60}
 
     def params(self, severity: int) -> dict:
         return {"sigma": self._SIGMA[severity]}
@@ -51,7 +48,7 @@ class GaussianNoise(Corruption):
 @register
 class JpegCompression(Corruption):
     name = "jpeg-compression"
-    _QUALITY = {1: 80, 2: 60, 3: 40, 4: 22, 5: 10}  # JPEG quality, lower = worse
+    _QUALITY = {1: 80, 2: 60, 3: 40, 4: 22, 5: 10}
 
     def params(self, severity: int) -> dict:
         return {"quality": self._QUALITY[severity]}
@@ -75,7 +72,7 @@ class JpegCompression(Corruption):
 @register
 class DefocusBlur(Corruption):
     name = "defocus-blur"
-    _RADIUS = {1: 1, 2: 2, 3: 3, 4: 5, 5: 8}  # gaussian sigma px
+    _RADIUS = {1: 1, 2: 2, 3: 3, 4: 5, 5: 8}
 
     def params(self, severity: int) -> dict:
         return {"sigma_px": self._RADIUS[severity]}
@@ -85,7 +82,6 @@ class DefocusBlur(Corruption):
         if _HAVE_CV2:
             k = 2 * (3 * sigma) + 1
             return cv2.GaussianBlur(image, (k, k), sigmaX=sigma)
-        # numpy separable fallback (no cv2): 1D gaussian along each axis.
         r = 3 * sigma
         xs = np.arange(-r, r + 1)
         g = np.exp(-(xs**2) / (2 * sigma**2))
@@ -96,51 +92,118 @@ class DefocusBlur(Corruption):
         return _clip8(out)
 
 
-# --- Declared stubs: ranges set, kernel TODO --------------------------------
-class _Stub(Corruption):
-    _RANGES: dict[int, dict] = {}
+@register
+class MotionBlur(Corruption):
+    name = "motion-blur"
+    _KERNEL = {1: 3, 2: 7, 3: 13, 4: 21, 5: 31}
 
     def params(self, severity: int) -> dict:
-        return self._RANGES.get(severity, {})
+        return {"kernel_px": self._KERNEL[severity]}
 
     def apply(self, image, severity, rng):
-        raise NotImplementedError(f"{self.name}: params fixed, kernel TODO (plan §6)")
+        k = self._KERNEL[severity]
+        kernel = np.zeros((k, k), dtype=np.float32)
+        kernel[k // 2, :] = 1.0 / k
+        if _HAVE_CV2:
+            return cv2.filter2D(image, -1, kernel)
+        # numpy fallback: horizontal box blur via separable convolve
+        out = image.astype(np.float32)
+        box = np.ones(k, dtype=np.float32) / k
+        for c in range(out.shape[2] if out.ndim == 3 else 1):
+            plane = out[..., c] if out.ndim == 3 else out
+            blurred = np.apply_along_axis(lambda m: np.convolve(m, box, mode="same"), 1, plane)
+            if out.ndim == 3:
+                out[..., c] = blurred
+            else:
+                out = blurred
+        return _clip8(out)
 
 
 @register
-class MotionBlur(_Stub):
-    name = "motion-blur"
-    # Fixed-kernel variant, px length. Physically-motivated variant scales by GT pose velocity.
-    _RANGES = {1: {"kernel_px": 3}, 2: {"kernel_px": 7}, 3: {"kernel_px": 13},
-               4: {"kernel_px": 21}, 5: {"kernel_px": 31}}
-
-
-@register
-class LowLight(_Stub):
+class LowLight(Corruption):
     name = "low-light"
-    # gain/gamma reduction + Poisson-Gaussian sensor noise (pair darkening with realistic noise).
-    _RANGES = {1: {"gain": 0.8}, 2: {"gain": 0.6}, 3: {"gain": 0.4},
-               4: {"gain": 0.25}, 5: {"gain": 0.12}}
+    _GAIN = {1: 0.8, 2: 0.6, 3: 0.4, 4: 0.25, 5: 0.12}
+
+    def params(self, severity: int) -> dict:
+        return {"gain": self._GAIN[severity]}
+
+    def apply(self, image, severity, rng):
+        gain = self._GAIN[severity]
+        # Darken then add Poisson-Gaussian read/shot noise (approximate).
+        dark = image.astype(np.float32) * gain
+        # shot: scale so mean ≈ photon count proxy; read noise grows as scene darkens
+        lam = np.clip(dark, 0, 255)
+        shot = rng.poisson(lam).astype(np.float32)
+        read_sigma = 2.0 + 6.0 * (1.0 - gain)
+        read = rng.normal(0.0, read_sigma, size=image.shape)
+        return _clip8(shot + read)
 
 
 @register
-class ExposureChange(_Stub):
+class ExposureChange(Corruption):
     name = "exposure-change"
-    # sudden gain step / over-under ramp / clipping — tests photometric front-ends.
-    _RANGES = {1: {"step": 0.2}, 2: {"step": 0.4}, 3: {"step": 0.7},
-               4: {"step": 1.2}, 5: {"step": 2.0}}
+    _STEP = {1: 0.2, 2: 0.4, 3: 0.7, 4: 1.2, 5: 2.0}
+
+    def params(self, severity: int) -> dict:
+        return {"step": self._STEP[severity]}
+
+    def apply(self, image, severity, rng):
+        step = self._STEP[severity]
+        # Random direction: over- or under-expose, with hard clipping.
+        sign = 1.0 if rng.random() < 0.5 else -1.0
+        factor = (1.0 + sign * step) if sign > 0 else max(1.0 / (1.0 + step), 0.05)
+        return _clip8(image.astype(np.float32) * factor)
 
 
 @register
-class DynamicObjects(_Stub):
+class DynamicObjects(Corruption):
     name = "dynamic-objects"
-    # synthetic moving-patch insertion for controlled severity; native dynamic splits used separately.
     _RANGES = {s: {"patches": s, "area_frac": 0.05 * s} for s in (1, 2, 3, 4, 5)}
 
+    def params(self, severity: int) -> dict:
+        return dict(self._RANGES[severity])
+
+    def apply(self, image, severity, rng):
+        out = image.copy()
+        h, w = out.shape[:2]
+        n = self._RANGES[severity]["patches"]
+        area = self._RANGES[severity]["area_frac"]
+        for _ in range(n):
+            ph = max(2, int(round(np.sqrt(area) * h * rng.uniform(0.6, 1.4))))
+            pw = max(2, int(round(np.sqrt(area) * w * rng.uniform(0.6, 1.4))))
+            ph = min(ph, h)
+            pw = min(pw, w)
+            y0 = int(rng.integers(0, max(h - ph, 1)))
+            x0 = int(rng.integers(0, max(w - pw, 1)))
+            color = rng.integers(0, 256, size=(3,), dtype=np.int64)
+            out[y0:y0 + ph, x0:x0 + pw] = color.astype(np.uint8)
+        return out
+
 
 @register
-class FrameDrop(_Stub):
+class FrameDrop(Corruption):
+    """Stream-level only — apply() is a no-op passthrough for image pipelines."""
+
     name = "frame-drop"
-    # drop k% of frames — stresses tracking continuity. Applied at stream level, not per-image.
-    _RANGES = {1: {"drop_frac": 0.02}, 2: {"drop_frac": 0.05}, 3: {"drop_frac": 0.10},
-               4: {"drop_frac": 0.20}, 5: {"drop_frac": 0.35}}
+    _DROP = {1: 0.02, 2: 0.05, 3: 0.10, 4: 0.20, 5: 0.35}
+
+    def params(self, severity: int) -> dict:
+        return {"drop_frac": self._DROP[severity]}
+
+    def apply(self, image, severity, rng):
+        return image
+
+    def drop_mask(self, n_frames: int, severity: int, rng: np.random.Generator) -> np.ndarray:
+        """True = keep frame. Always keeps first and last frame."""
+        frac = self._DROP[severity]
+        keep = np.ones(n_frames, dtype=bool)
+        if n_frames <= 2:
+            return keep
+        n_drop = int(round(frac * n_frames))
+        candidates = np.arange(1, n_frames - 1)
+        if n_drop <= 0 or len(candidates) == 0:
+            return keep
+        n_drop = min(n_drop, len(candidates))
+        drop_idx = rng.choice(candidates, size=n_drop, replace=False)
+        keep[drop_idx] = False
+        return keep

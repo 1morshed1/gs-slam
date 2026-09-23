@@ -61,12 +61,12 @@ Pick **1–2 systems per family** for the core grid; keep 1–2 more as "stretch
 
 You have two very different machines. Their roles are **not** interchangeable, and conflating them is the fastest way to an unpublishable energy claim.
 
-### Tier A — Office rig `vm-130-131` (Blackwell, `sm_120`, GPU-1 only)
+### Tier A — Office rig `vm-130-131` (Blackwell, `sm_120`, GPU-2 only)
 **Role: development, dataset/perturbation generation, accuracy ground-truth, quality (PSNR/SSIM/LPIPS) upper bound, feasibility ("does it build/run"), and analysis.**
 - **Not** the primary energy device. It's a shared KVM guest; `nvidia-smi` reports **GPU-only** power (not CPU/system), and datacenter-GPU joules are not "edge." At most it yields a *coarse relative* server-class energy point for context — clearly labelled as such.
 - 96 GiB VRAM makes it the place to run the *reference* tier of heavy GS/GFM systems at full resolution to get "best-case accuracy/quality" numbers the Jetson results are compared against.
 - ⚠️ **Blackwell `sm_120` is the hard part.** GS rasterizers (`diff-gaussian-rasterization`), DROID/lietorch-style custom ops, and MASt3R/VGGT kernels frequently fail to compile on brand-new arches. Budget real time here (§13, Risk R1). Mitigations: `TORCH_CUDA_ARCH_LIST="12.0"`, use `sm_120`-patched rasterizer forks, keep torch pinned to your working `2.11.0+cu128`, never let a blind `pip install` downgrade torch.
-- **Shared-box hygiene:** GPU-1 only (`CUDA_VISIBLE_DEVICES=1`); watch disk — the box was recently near-full and Docker already holds ~200 GiB. GS/foundation datasets (Replica, ScanNet++, TartanAir) + per-system images will add tens–hundreds of GiB. Reserve/track disk in Phase 0.
+- **Shared-box hygiene:** GPU-2 only (`CUDA_VISIBLE_DEVICES=2`); watch disk — the box was recently near-full and Docker already holds ~200 GiB. GS/foundation datasets (Replica, ScanNet++, TartanAir) + per-system images will add tens–hundreds of GiB. Reserve/track disk in Phase 0.
 
 ### Tier B — Jetson (the *actual* device-under-test) ⚠️ model TBD
 **Role: the real edge measurements — J/frame, J/keyframe, latency, peak memory, thermal throttling, sustained vs. burst.** This is the heart of the paper.
@@ -241,7 +241,7 @@ harness/
 | **R5** | Modality mismatch → unfair comparison | Med | group by modality; state depth availability; never mix into one ranking |
 | **R6** | Thermal drift confounds cross-system comparison | Med | steady-state before measuring; randomized run order; report sustained + burst |
 | **R7** | Baseline repos finicky / unreproducible | Med-High | Phase-0 gate reproduces each paper's number before inclusion; drop with justification if not |
-| **R8** | Shared office box: disk/Docker pressure, GPU contention | Med | GPU-1 pinned; track disk; schedule around your VLA workload |
+| **R8** | Shared office box: disk/Docker pressure, GPU contention | Med | GPU-2 pinned; track disk; schedule around your VLA workload |
 | **R9** | Scope creep (matrix explosion) | Med | staged pruning (§9); clean baseline is already a paper-worthy result |
 
 ---

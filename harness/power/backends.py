@@ -17,7 +17,7 @@ from .base import PowerSampler
 class NvidiaSmiSampler(PowerSampler):
     """Reads GPU power draw via `nvidia-smi`. Office rig only, GPU rail only.
 
-    Honors CUDA_VISIBLE_DEVICES scoping by querying a specific index (plan §4A: GPU-1).
+    Honors CUDA_VISIBLE_DEVICES scoping by querying a specific index (plan §4A: GPU-2).
     Caveat baked into the source: this misses CPU/system power and is datacenter silicon,
     so it is *context*, never the edge energy headline.
     """
@@ -25,7 +25,7 @@ class NvidiaSmiSampler(PowerSampler):
     source = "nvidia-smi"
     rails = ("gpu",)
 
-    def __init__(self, hz: float = 20.0, gpu_index: int = 1) -> None:
+    def __init__(self, hz: float = 20.0, gpu_index: int = 2) -> None:
         super().__init__(hz=hz)
         self.gpu_index = gpu_index
         if shutil.which("nvidia-smi") is None:

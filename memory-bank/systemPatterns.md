@@ -48,5 +48,5 @@ matrix → orchestrator.run → adapter.run(stream)
 
 ## Hardware roles (not interchangeable)
 
-- **Tier A office rig** (`vm-130-131`, Blackwell `sm_120`, GPU-1 only): build, corruptions, accuracy/quality upper bound, analysis. Not primary energy device.
+- **Tier A office rig** (`vm-130-131`, Blackwell `sm_120`, GPU-2 only): build, corruptions, accuracy/quality upper bound, analysis. Not primary energy device.
 - **Tier B Jetson** (model TBD): real J/frame, thermal, edge feasibility. aarch64 L4T rebuild required.

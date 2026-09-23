@@ -73,3 +73,59 @@ def test_corruption_determinism_and_severity():
     lo = noise.apply(img, 1, np.random.default_rng(0)).astype(int)
     hi = noise.apply(img, 5, np.random.default_rng(0)).astype(int)
     assert np.abs(hi - img).mean() > np.abs(lo - img).mean()
+
+
+def test_tum_loader_and_feeder(tmp_path):
+    from harness.datasets.frame import Modality
+    from harness.datasets.feeder import FixedRateFeeder
+    from harness.datasets.loaders import load_tum_rgbd, write_associations
+
+    root = tmp_path / "rgbd_dataset_freiburg1_desk"
+    (root / "rgb").mkdir(parents=True)
+    (root / "depth").mkdir()
+    # minimal 2-frame synthetic TUM layout
+    import numpy as np
+    try:
+        import cv2
+    except Exception:
+        cv2 = None
+    for i, name in enumerate(("a", "b")):
+        rgb = root / "rgb" / f"{name}.png"
+        depth = root / "depth" / f"{name}.png"
+        if cv2 is not None:
+            cv2.imwrite(str(rgb), np.zeros((8, 8, 3), np.uint8))
+            cv2.imwrite(str(depth), np.zeros((8, 8), np.uint16))
+        else:
+            rgb.write_bytes(b"\x89PNG\r\n\x1a\n")
+            depth.write_bytes(b"\x89PNG\r\n\x1a\n")
+    (root / "rgb.txt").write_text("1.0 rgb/a.png\n1.1 rgb/b.png\n")
+    (root / "depth.txt").write_text("1.0 depth/a.png\n1.1 depth/b.png\n")
+    (root / "groundtruth.txt").write_text(
+        "# ts tx ty tz qx qy qz qw\n1.0 0 0 0 0 0 0 1\n1.1 0 0 0 0 0 0 1\n"
+    )
+    write_associations(
+        root / "associations.txt",
+        [(1.0, "rgb/a.png", 1.0, "depth/a.png"),
+         (1.1, "rgb/b.png", 1.1, "depth/b.png")],
+    )
+    stream = load_tum_rgbd(root)
+    assert len(stream) == 2
+    assert Modality.RGBD in stream.modalities
+    marks = []
+    feeder = FixedRateFeeder(stream, target_fps=100.0, on_marker=lambda i, t: marks.append(i))
+    frames = list(feeder)
+    assert len(frames) == 2 and marks == [0, 1]
+
+
+def test_orb_slam3_accepts_rgbd():
+    from harness.adapters import systems  # noqa: F401
+    from harness.adapters.base import REGISTRY
+    from harness.datasets.frame import FrameStream, Modality
+    from pathlib import Path
+
+    adapter = REGISTRY["orb_slam3"]()
+    stream = FrameStream(
+        dataset="tum", sequence="x", root=Path("."),
+        frames=[], modalities=frozenset({Modality.RGBD, Modality.MONO}),
+    )
+    assert adapter.can_run(stream)

@@ -35,7 +35,7 @@ def _integrate(ts: np.ndarray, watts: np.ndarray, t0: float, t1: float) -> float
     mask = (ts > t0) & (ts < t1)
     xs = np.concatenate(([grid[0]], ts[mask], [grid[1]]))
     ys = np.concatenate(([edge_w[0]], watts[mask], [edge_w[1]]))
-    return float(np.trapz(ys, xs))
+    return float(np.trapezoid(ys, xs) if hasattr(np, "trapezoid") else np.trapz(ys, xs))
 
 
 def integrate_energy(

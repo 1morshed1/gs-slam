@@ -60,8 +60,10 @@ class SLAMAdapter(abc.ABC):
     family: str = "classical"  # "classical" | "gs" | "gfm"
     #: exact commit pinned in the run manifest (plan §3.4, §10)
     commit: str = "UNPINNED"
-    #: modality this adapter needs from the stream
+    #: modality this adapter needs from the stream (legacy single-modality)
     required_modality: Modality = Modality.MONO
+    #: if set, any of these modalities on the stream is enough (plan §9.4)
+    supported_modalities: Optional[frozenset[Modality]] = None
     #: True for GS/GFM systems that produce renderable maps
     renders: bool = False
 
@@ -78,7 +80,10 @@ class SLAMAdapter(abc.ABC):
 
     def can_run(self, stream: FrameStream) -> bool:
         """Skip modality-incompatible cells cleanly (plan §9.4)."""
-        return self.required_modality in stream.modalities
+        needed = self.supported_modalities
+        if needed is None:
+            needed = frozenset({self.required_modality})
+        return bool(needed & stream.modalities)
 
 
 # system name -> adapter class. Populated by concrete adapter modules on import.
