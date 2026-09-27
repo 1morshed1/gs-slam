@@ -2,7 +2,21 @@
 
 ## Current focus
 
-**Phase-0 ORB-SLAM3 gate passed on office rig.** Harness foundations restored; TUM fr1/desk downloaded; smoke corruptions pre-generated; ORB-SLAM3 container built; clean matrix cells run end-to-end with ATE.
+**Phase-0 Photo-SLAM bring-up in progress.** ORB-SLAM3 P0 + smoke already passed.
+
+## GPU policy (2026-09-27)
+
+**Always use GPU-1** (user directive). Do not use GPU-2 (or GPU-0).
+
+- Containers: `--gpus device=1`; power sampler: `gpu_index=1`; wait script: `scripts/wait_gpu.sh` (default `GPU_INDEX=1`).
+- GPU-1 is shared (other jobs present); `wait_gpu.sh` gates on free memory/util.
+
+## Photo-SLAM status
+
+- Build 1 failed on `FLT_MAX` (fixed: `<cfloat>` sed in `simple_knn.cu`).
+- Build 2 failed: `opencv2/cudawarping.hpp` / `cudaimgproc.hpp` missing (apt OpenCV has no CUDA modules).
+- **Build 3 running (2026-09-27):** Dockerfile now builds OpenCV 4.10.0 + contrib from source (`WITH_CUDA`, `CUDA_ARCH_BIN=12.0`, dnn/cudacodec off). Log: `/tmp/photo_slam_build.log`.
+- **P0 chained:** `scripts/schedule_photo_slam_p0.sh` waits for image → `wait_gpu.sh` (GPU-1) → `run_photo_slam_p0.sh`. Log: `/tmp/photo_slam_p0_schedule.log`; result: `runs/photo_slam_p0_fr1_desk/p0_summary.json`.
 
 ## Recent changes (2026-09-23)
 
@@ -27,15 +41,15 @@ In-family with published ORB-SLAM3 RGB-D fr1/desk (~1–2 cm).
 |---|---|
 | Modality | **Locked** — mono + RGB-D + stereo + VI |
 | First SUT | **ORB-SLAM3** (P0 passed on rig) |
-| Office GPU | **GPU-2** (`CUDA_VISIBLE_DEVICES=2`) |
+| Office GPU | **GPU-1** (`--gpus device=1`), always |
 | Docker mounts | **Blocked by OPA** — adapter uses cp/exec + detached run |
 | Jetson model / RAM / JetPack | **Open** |
 | Power gear | **Open** — office `nvidia-smi` is context only |
 
 ## Next steps
 
-1. Optional: run full smoke matrix (corrupted cells) once clean gate is trusted.
-2. Phase-0 next SUT (Photo-SLAM) — expect `sm_120` pain.
+1. ~~Optional: run full smoke matrix (corrupted cells)~~ **Done 2026-09-24** — see progress.md.
+2. Phase-0 Photo-SLAM — **in progress** (build 3 + chained P0 on GPU-1); check logs above, compare ATE to paper fr1/desk.
 3. Decide Jetson + power gear → L4T + tegrastats.
 4. Broader dataset acquisition (Replica / EuRoC / TartanAir) with disk budget.
 

@@ -35,7 +35,7 @@ def _load_config(path: Path) -> ExperimentConfig:
 
 def _make_sampler(cfg: ExperimentConfig) -> PowerSampler:
     if cfg.hardware_tier == "office_rig":
-        return NvidiaSmiSampler(hz=20.0, gpu_index=2)
+        return NvidiaSmiSampler(hz=20.0, gpu_index=1)
     raise NotImplementedError(f"no power backend wired for tier {cfg.hardware_tier!r}")
 
 

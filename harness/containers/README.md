@@ -20,7 +20,7 @@ containers/<system>/
 - Use `sm_120`-patched rasterizer forks for GS systems (`diff-gaussian-rasterization`).
 - Keep torch pinned to the working `2.11.0+cu128`; a blind `pip install` must never
   downgrade it.
-- `CUDA_VISIBLE_DEVICES=2` (GPU-2 only) — shared box.
+- `CUDA_VISIBLE_DEVICES=1` (GPU-1 only) — shared box.
 
 ## L4T (Jetson) — deferred
 

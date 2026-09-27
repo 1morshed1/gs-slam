@@ -31,6 +31,19 @@ class _ContainerAdapter(SLAMAdapter):
     traj_name: str = "trajectory.txt"
     #: classical ORB does not need a GPU; GS/GFM images will set True
     needs_gpu: bool = False
+    #: substring matched in `docker top` while the detached job runs
+    poll_process: str = "rgbd_tum"
+
+    def _detached_launch_bash(self) -> str:
+        """Bash that backgrounds the SUT inside the container and prints PID."""
+        return (
+            "mkdir -p /out && cd /out && "
+            "nohup /opt/ORB_SLAM3/Examples/RGB-D/rgbd_tum "
+            "/opt/ORB_SLAM3/Vocabulary/ORBvoc.txt "
+            "/opt/ORB_SLAM3/Examples/RGB-D/TUM1.yaml "
+            "/data /data/associations.txt "
+            ">/out/run.log 2>&1 & echo $!"
+        )
 
     def run(self, stream: FrameStream, out_dir: Path, *, timeout_s: float) -> AdapterResult:
         # Accept FixedRateFeeder or FrameStream — orchestrator may pass either.
@@ -92,7 +105,7 @@ class _ContainerAdapter(SLAMAdapter):
     ) -> AdapterResult | None:
         cmd = ["docker", "run", "--rm"]
         if self.needs_gpu:
-            cmd += ["--gpus", "device=2", "-e", "CUDA_VISIBLE_DEVICES=0"]
+            cmd += ["--gpus", "device=1", "-e", "CUDA_VISIBLE_DEVICES=0"]
         cmd += [
             "-v", f"{data_root.resolve()}:/data:ro",
             "-v", f"{out_dir.resolve()}:/out",
@@ -129,7 +142,7 @@ class _ContainerAdapter(SLAMAdapter):
             "--entrypoint", "sleep", self.image, str(max(int(timeout_s) + 60, 120)),
         ]
         if self.needs_gpu:
-            create[2:2] = ["--gpus", "device=2", "-e", "CUDA_VISIBLE_DEVICES=0"]
+            create[2:2] = ["--gpus", "device=1", "-e", "CUDA_VISIBLE_DEVICES=0"]
         try:
             c = subprocess.run(create, capture_output=True, text=True, timeout=60)
             if c.returncode != 0:
@@ -151,15 +164,8 @@ class _ContainerAdapter(SLAMAdapter):
                     error_detail=f"docker cp in failed: {cp_in.stderr}",
                 )
             # Detached in-container run: capturing docker-exec stdout on this host can
-            # SIGPIPE/kill ORB mid-sequence. Launch inside the container, then poll.
-            launch = (
-                "mkdir -p /out && cd /out && "
-                "nohup /opt/ORB_SLAM3/Examples/RGB-D/rgbd_tum "
-                "/opt/ORB_SLAM3/Vocabulary/ORBvoc.txt "
-                "/opt/ORB_SLAM3/Examples/RGB-D/TUM1.yaml "
-                "/data /data/associations.txt "
-                ">/out/run.log 2>&1 & echo $!"
-            )
+            # SIGPIPE/kill the SUT mid-sequence. Launch inside the container, then poll.
+            launch = self._detached_launch_bash()
             launch_proc = subprocess.run(
                 ["docker", "exec", name, "bash", "-lc", launch],
                 capture_output=True, text=True, timeout=60,
@@ -169,7 +175,8 @@ class _ContainerAdapter(SLAMAdapter):
                     outcome=RunOutcome.CRASH, trajectory_path=None,
                     error_detail=f"launch failed: {launch_proc.stderr}",
                 )
-            # Poll until rgbd_tum exits or timeout.
+            needle = self.poll_process
+            # Poll until process exits or timeout.
             deadline = time.monotonic() + timeout_s
             finished = False
             while time.monotonic() < deadline:
@@ -177,13 +184,14 @@ class _ContainerAdapter(SLAMAdapter):
                     ["docker", "top", name],
                     capture_output=True, text=True, timeout=30,
                 )
-                if "rgbd_tum" not in (top.stdout or ""):
+                if needle not in (top.stdout or ""):
                     finished = True
                     break
                 time.sleep(2.0)
             if not finished:
                 subprocess.run(
-                    ["docker", "exec", name, "bash", "-lc", "pkill -9 rgbd_tum || true"],
+                    ["docker", "exec", name, "bash", "-lc",
+                     f"pkill -9 -f {needle!s} || true"],
                     capture_output=True, timeout=30,
                 )
                 return AdapterResult(
@@ -198,10 +206,21 @@ class _ContainerAdapter(SLAMAdapter):
             run_log = out_dir / "run.log"
             if run_log.is_file():
                 (out_dir / "docker_stdout.log").write_text(run_log.read_text())
-            # ORB exit code isn't easily recovered from nohup; infer from artifacts.
-            traj = out_dir / "CameraTrajectory.txt"
-            rc = 0 if traj.is_file() and traj.stat().st_size > 0 else 1
-            return self._finalize_traj(out_dir, rc, "detached rgbd_tum")
+            # Prefer SUT-specific traj name, then ORB/Photo canonical aliases.
+            traj = out_dir / self.traj_name
+            for alt in ("CameraTrajectory.txt", "CameraTrajectory_TUM.txt"):
+                if not traj.is_file() or traj.stat().st_size == 0:
+                    cand = out_dir / alt
+                    if cand.is_file() and cand.stat().st_size > 0:
+                        traj = cand
+                        break
+            if not traj.is_file() or traj.stat().st_size == 0:
+                return AdapterResult(
+                    outcome=RunOutcome.LOST_TRACK,
+                    trajectory_path=None,
+                    error_detail=f"no trajectory written ({needle})",
+                )
+            return self._finalize_traj(out_dir, 0, f"detached {needle}")
         finally:
             subprocess.run(
                 ["docker", "rm", "-f", name],
@@ -273,8 +292,28 @@ class PhotoSlam(_ContainerAdapter):
     name = "photo_slam"
     family = "gs"
     required_modality = Modality.RGBD  # also mono/stereo
+    supported_modalities = frozenset({Modality.RGBD, Modality.MONO, Modality.STEREO})
     renders = True
     image = "harness/photo_slam:x86"
+    traj_name = "CameraTrajectory_TUM.txt"
+    needs_gpu = True
+    poll_process = "tum_rgbd"
+
+    def __init__(self) -> None:
+        lock = Path(__file__).resolve().parents[2] / "containers" / "photo_slam" / "commit.lock"
+        if lock.is_file():
+            for line in lock.read_text().splitlines():
+                if line.startswith("commit:"):
+                    self.commit = line.split(":", 1)[1].strip()
+                    break
+
+    def _detached_launch_bash(self) -> str:
+        # Prefer entrypoint (handles bundled associations + no_viewer).
+        return (
+            "mkdir -p /out && "
+            "nohup /opt/entrypoint.sh --data /data --out /out "
+            ">/out/run.log 2>&1 & echo $!"
+        )
 
 
 @register

@@ -1,0 +1,88 @@
+# Photo-SLAM x86 container for edge-slam-benchmark (plan §10 / Phase 0 GS).
+# Blackwell sm_120: TORCH_CUDA_ARCH_LIST=12.0 + CUDA_ARCHITECTURES patch.
+# Pin torch via pip cu128; never blind-upgrade.
+FROM nvidia/cuda:12.8.1-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV TORCH_CUDA_ARCH_LIST="12.0"
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH="${CUDA_HOME}/bin:${PATH}"
+ENV LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake git wget ca-certificates unzip \
+        python3 python3-pip python3-dev \
+        libeigen3-dev libgl1-mesa-dev libglew-dev \
+        libboost-all-dev libssl-dev libepoxy-dev \
+        libjsoncpp-dev libglm-dev libglfw3-dev \
+        libjpeg-dev libpng-dev libtiff-dev \
+        ninja-build pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Photo-SLAM needs OpenCV CUDA modules (cudawarping, cudaimgproc) — apt OpenCV lacks them.
+ARG OPENCV_VERSION=4.10.0
+RUN cd /tmp \
+    && git clone --depth 1 -b "${OPENCV_VERSION}" https://github.com/opencv/opencv.git \
+    && git clone --depth 1 -b "${OPENCV_VERSION}" https://github.com/opencv/opencv_contrib.git \
+    && cmake -S opencv -B opencv/build -G Ninja \
+         -DCMAKE_BUILD_TYPE=Release \
+         -DCMAKE_INSTALL_PREFIX=/usr/local \
+         -DOPENCV_EXTRA_MODULES_PATH=/tmp/opencv_contrib/modules \
+         -DWITH_CUDA=ON -DCUDA_ARCH_BIN=12.0 -DCUDA_ARCH_PTX= \
+         -DWITH_CUBLAS=ON -DWITH_CUDNN=OFF -DOPENCV_DNN_CUDA=OFF \
+         -DBUILD_opencv_dnn=OFF -DBUILD_opencv_cudacodec=OFF \
+         -DBUILD_opencv_python3=OFF -DBUILD_opencv_java=OFF \
+         -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF \
+    && cmake --build opencv/build -j"$(nproc)" \
+    && cmake --install opencv/build \
+    && ldconfig \
+    && test -f /usr/local/include/opencv4/opencv2/cudawarping.hpp \
+    && test -f /usr/local/include/opencv4/opencv2/cudaimgproc.hpp \
+    && rm -rf /tmp/opencv /tmp/opencv_contrib
+
+# Torch (cu128) — provides LibTorch cmake package for Photo-SLAM
+RUN pip3 install --no-cache-dir --upgrade pip \
+    && pip3 install --no-cache-dir \
+        torch==2.7.1 torchvision==0.22.1 \
+        --index-url https://download.pytorch.org/whl/cu128
+
+ARG PHOTO_SLAM_COMMIT=f8bfb2f0809c003ccc3fd577dc43c576fcafa4ac
+WORKDIR /opt
+RUN git clone --recursive https://github.com/HuajianUP/Photo-SLAM.git Photo-SLAM \
+    && cd Photo-SLAM \
+    && git checkout "${PHOTO_SLAM_COMMIT}" \
+    && git submodule update --init --recursive \
+    # Blackwell: upstream only lists 75;86
+    && sed -i 's/CUDA_ARCHITECTURES "75;86"/CUDA_ARCHITECTURES "75;86;120"/' CMakeLists.txt \
+    # Newer CUDA/torch: FLT_MAX needs <cfloat> in simple-knn
+    && sed -i '1i #include <cfloat>' third_party/simple-knn/simple_knn.cu \
+    && chmod +x build.sh
+
+# Build thirdparty + ORB-SLAM3 + Photo-SLAM against pip torch
+WORKDIR /opt/Photo-SLAM
+RUN TORCH_CMAKE="$(python3 -c 'import torch; print(torch.utils.cmake_prefix_path)')" \
+    && echo "Torch cmake prefix: ${TORCH_CMAKE}" \
+    && cd ORB-SLAM3/Thirdparty/DBoW2 && mkdir -p build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j"$(nproc)" \
+    && cd ../../g2o && mkdir -p build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j"$(nproc)" \
+    && cd ../../Sophus && mkdir -p build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j"$(nproc)" \
+    && cd /opt/Photo-SLAM/ORB-SLAM3/Vocabulary \
+    && tar -xf ORBvoc.txt.tar.gz \
+    && cd /opt/Photo-SLAM/ORB-SLAM3 && mkdir -p build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j"$(nproc)" \
+    && cd /opt/Photo-SLAM && mkdir -p build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release \
+         -DTorch_DIR="${TORCH_CMAKE}/Torch" \
+         -DCMAKE_CUDA_ARCHITECTURES="75;86;120" \
+    && make -j"$(nproc)" \
+    && test -x /opt/Photo-SLAM/bin/tum_rgbd \
+    && ls -la /opt/Photo-SLAM/bin/tum_rgbd \
+    && ls -la /opt/Photo-SLAM/ORB-SLAM3/Vocabulary/ORBvoc.txt
+
+COPY entrypoint.sh /opt/entrypoint.sh
+RUN chmod +x /opt/entrypoint.sh
+WORKDIR /opt/Photo-SLAM
+ENTRYPOINT ["/opt/entrypoint.sh"]

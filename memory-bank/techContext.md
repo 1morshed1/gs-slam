@@ -25,7 +25,7 @@ python -m harness.orchestrator.run --config harness/orchestrator/configs/smoke.y
 
 ## Office-rig constraints (Blackwell)
 
-- `CUDA_VISIBLE_DEVICES=2` (shared box, GPU-2 only).
+- `CUDA_VISIBLE_DEVICES=1` (shared box, GPU-1 only).
 - `TORCH_CUDA_ARCH_LIST="12.0"` for custom CUDA.
 - Pin torch to working `2.11.0+cu128`; never let blind `pip install` downgrade.
 - GS rasterizers: prefer `sm_120`-patched `diff-gaussian-rasterization` forks.
@@ -46,6 +46,8 @@ python -m harness.orchestrator.run --config harness/orchestrator/configs/smoke.y
 | gfm | `mast3r_slam`, `vggt_slam` (stretch) | stubs |
 
 ORB image: `harness/orb_slam3:x86` @ `4452a3c4…`. Host OPA blocks `-v`; adapter uses docker cp/exec + detached `rgbd_tum`.
+
+Photo-SLAM image: `harness/photo_slam:x86` @ `f8bfb2f0…` — CUDA 12.8.1 devel, torch 2.7.1 cu128, OpenCV 4.10.0 + contrib (CUDA, `sm_120`) from source, arch list patched to `75;86;120`.
 
 ## Datasets
 

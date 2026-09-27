@@ -13,7 +13,7 @@ Prior art covers SLAM energy (SLAMBench2, Jetson ORB studies, Orin VIO/SLAM powe
 
 ## How it should work (user journey)
 
-1. **Dev/rig:** generate datasets + corruptions, build adapters/containers, sanity-check accuracy on `vm-130-131` (GPU-2, Blackwell `sm_120`).
+1. **Dev/rig:** generate datasets + corruptions, build adapters/containers, sanity-check accuracy on `vm-130-131` (GPU-1, Blackwell `sm_120`).
 2. **Measure:** replay fixed-rate frames on Jetson; power daemon samples with frame markers; orchestrator runs config-as-code matrix, resumes, records crashes/timeouts/lost-track as outcomes.
 3. **Eval:** evo ATE/RPE; optional PSNR/SSIM/LPIPS for renderers; energy integrate from power log; thermal parse.
 4. **Analyze:** notebooks read `store/` only — Pareto, severity curves, power-mode sweep, thermal sustained.

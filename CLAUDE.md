@@ -19,10 +19,10 @@ Agent continuity: read **`memory-bank/`** at start of non-trivial work (`project
 
 | Tier | Machine | Role |
 |---|---|---|
-| A | Office `vm-130-131`, Blackwell `sm_120`, **GPU-2 only** | Dev, corruptions, accuracy/quality reference, analysis |
+| A | Office `vm-130-131`, Blackwell `sm_120`, **GPU-1 only** | Dev, corruptions, accuracy/quality reference, analysis |
 | B | Jetson (model **TBD**) | Real J/frame, thermal, edge feasibility |
 
-Rig rules: `CUDA_VISIBLE_DEVICES=2`, `TORCH_CUDA_ARCH_LIST=12.0`, pin torch `2.11.0+cu128`, patched GS rasterizers for `sm_120`.
+Rig rules: `CUDA_VISIBLE_DEVICES=1`, `TORCH_CUDA_ARCH_LIST=12.0`, pin torch `2.11.0+cu128`, patched GS rasterizers for `sm_120`.
 
 ## Locked / open
 
