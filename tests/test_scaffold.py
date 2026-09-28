@@ -129,3 +129,19 @@ def test_orb_slam3_accepts_rgbd():
         frames=[], modalities=frozenset({Modality.RGBD, Modality.MONO}),
     )
     assert adapter.can_run(stream)
+
+
+def test_summarize_median_and_fail_rate(tmp_path):
+    from harness.store.db import ResultStore
+    from harness.store.summarize import summarize
+
+    store = ResultStore(tmp_path / "r.sqlite")
+    base = dict(system="orb_slam3", dataset="tum", sequence="s", modality="rgbd",
+                corruption="none", severity=0, power_mode="default", hardware_tier="office_rig")
+    for r, (outcome, ate) in enumerate([("ok", 0.01), ("ok", 0.02), ("ok", 0.09),
+                                        ("lost_track", None)]):
+        store.upsert(f"k{r}", dict(base, run_id=f"id{r}", repeat=r, outcome=outcome, ate_rmse=ate))
+    (s,) = summarize(store.db_path)
+    assert s["n"] == 4 and s["n_fail"] == 1 and abs(s["fail_rate"] - 0.25) < 1e-9
+    assert abs(s["ate_median"] - 0.02) < 1e-9       # median ignores the failed run
+    assert abs(s["ate_max"] - 0.09) < 1e-9
