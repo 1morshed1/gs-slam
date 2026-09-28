@@ -21,7 +21,12 @@
   - `c10::guts::to_string(param.unsafeGetTensorImpl())` → raw pointer (Adam state map is keyed by `void*` in torch 2.x; `std::to_string` would compile but break optimizer state lookup).
   - examples: `c10Alloc::Stat*` → `c10::CachingAllocator::Stat*`.
 - **Image built (2026-09-28):** `harness/photo_slam:x86` (~17.8 GB).
-- **P0 queued:** scheduler waiting on GPU-1 (`wait_gpu.sh`: ≥40 GiB free, ≤5% util ×3). GPU-1 has ~86 GiB free but another job keeps it at ~40–80% util, so P0 waits until that job idles. Log: `/tmp/photo_slam_p0_schedule.log`; result: `runs/photo_slam_p0_fr1_desk/p0_summary.json`.
+- **P0 first run (2026-09-28, GPU-1 shared with another job at ~45% util; user OK'd memory-only gate `MAX_UTIL=100`):**
+  - outcome `ok`, 573/573 poses, ~40 s wall.
+  - ATE-RMSE **0.0626 m**, RPE trans 0.0124 m, RPE rot 0.59°.
+  - Mapper: 2381 iters, keyframe PSNR mean **~18.0 dB**, DSSIM 0.67; GPU peak 1.1 GB.
+  - Worse than ORB-SLAM3 on same seq (~2 cm) and likely below paper numbers (paper values not yet verified). Suspects: sequence ends → immediate shutdown so mapper gets few iters; single repeat; shared GPU.
+  - Output: `runs/photo_slam_p0_fr1_desk/` (`p0_summary.json`, `2381_shutdown/` renders+PSNR).
 - Script fixes: scheduler's build-alive check anchored to the real buildx process (was matching the launching shell); `wait_gpu.sh` CSV parsing fixed (was reading `free,util` as one value → never ready).
 
 ## Recent changes (2026-09-23)
@@ -55,7 +60,7 @@ In-family with published ORB-SLAM3 RGB-D fr1/desk (~1–2 cm).
 ## Next steps
 
 1. ~~Optional: run full smoke matrix (corrupted cells)~~ **Done 2026-09-24** — see progress.md.
-2. Phase-0 Photo-SLAM — **image built; P0 queued on GPU-1**; check logs above, compare ATE to paper fr1/desk.
+2. Phase-0 Photo-SLAM — **first run ok but ATE 6.3 cm**: verify paper fr1/desk ATE/PSNR, run repeats, check realtime feeding / mapper iteration budget before calling P0 pass/fail.
 3. Decide Jetson + power gear → L4T + tegrastats.
 4. Broader dataset acquisition (Replica / EuRoC / TartanAir) with disk budget.
 
