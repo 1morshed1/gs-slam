@@ -24,9 +24,14 @@
 - **P0 first run (2026-09-28, GPU-1 shared with another job at ~45% util; user OK'd memory-only gate `MAX_UTIL=100`):**
   - outcome `ok`, 573/573 poses, ~40 s wall.
   - ATE-RMSE **0.0626 m**, RPE trans 0.0124 m, RPE rot 0.59°.
-  - Mapper: 2381 iters, keyframe PSNR mean **~18.0 dB**, DSSIM 0.67; GPU peak 1.1 GB.
+  - Mapper: 2381 iters, keyframe PSNR mean **~18.1 dB**, DSSIM 0.67; GPU peak 1.1 GB.
   - Worse than ORB-SLAM3 on same seq (~2 cm) and likely below paper numbers (paper values not yet verified). Suspects: sequence ends → immediate shutdown so mapper gets few iters; single repeat; shared GPU.
-  - Output: `runs/photo_slam_p0_fr1_desk/` (`p0_summary.json`, `2381_shutdown/` renders+PSNR).
+  - Output: `runs/photo_slam_p0_fr1_desk/contended_r0/`.
+- **Paper targets** (arXiv 2311.16728 Table 2, RGB-D fr1-desk, ATE cm / PSNR dB): desktop RTX 4090 **2.603 / 20.870**; laptop 3080Ti 1.891 / 20.403; Jetson AGX Orin 4.571 / 18.273. Our 6.26 / ~18.1 sits at/below the Jetson row.
+- **Mapper shutdown is by design, not a harness bug:** `tum_rgbd` feeds frames at real-time (sleeps to timestamps); after `Shutdown()` the mapper trains only `n_delay_iters` more, then saves (`gaussian_mapper.cpp` ~518–538). Paper numbers use this same online protocol → do NOT extend training to "fix" PSNR; that would diverge from the paper.
+- Implication: Photo-SLAM accuracy/quality is **compute-coupled** (fixed real-time window → iterations depend on GPU throughput; paper's Jetson row is worse on both ATE and PSNR). A contended GPU-1 is therefore NOT neutral for Photo-SLAM P0. Re-run P0 with GPU-1 idle before judging; record iteration count per run.
+- Protocol caveat: our PSNR is Photo-SLAM's keyframe `psnr.txt`; confirm it matches the paper's eval protocol before comparing.
+- **Idle-GPU repeats (queued 2026-09-28):** `run_photo_slam_p0.sh` now runs `REPEATS` (default 3) into `runs/photo_slam_p0_fr1_desk/r{i}/`, each gated on `wait_gpu.sh` (≤5% util), and records `mapper_iterations`, `keyframe_psnr_mean`, `gpu1_at_start` in `p0_summary.json`.
 - Script fixes: scheduler's build-alive check anchored to the real buildx process (was matching the launching shell); `wait_gpu.sh` CSV parsing fixed (was reading `free,util` as one value → never ready).
 
 ## Recent changes (2026-09-23)
@@ -60,7 +65,7 @@ In-family with published ORB-SLAM3 RGB-D fr1/desk (~1–2 cm).
 ## Next steps
 
 1. ~~Optional: run full smoke matrix (corrupted cells)~~ **Done 2026-09-24** — see progress.md.
-2. Phase-0 Photo-SLAM — **first run ok but ATE 6.3 cm**: verify paper fr1/desk ATE/PSNR, run repeats, check realtime feeding / mapper iteration budget before calling P0 pass/fail.
+2. Phase-0 Photo-SLAM — **first run ok but ATE 6.3 cm** vs paper desktop 2.6 cm / 20.9 dB: re-run on idle GPU-1 with ≥3 repeats (per-repeat output dirs), log mapper iterations, verify PSNR protocol, then verdict.
 3. Decide Jetson + power gear → L4T + tegrastats.
 4. Broader dataset acquisition (Replica / EuRoC / TartanAir) with disk budget.
 
