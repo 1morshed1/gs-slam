@@ -15,8 +15,14 @@
 
 - Build 1 failed on `FLT_MAX` (fixed: `<cfloat>` sed in `simple_knn.cu`).
 - Build 2 failed: `opencv2/cudawarping.hpp` / `cudaimgproc.hpp` missing (apt OpenCV has no CUDA modules).
-- **Build 3 running (2026-09-27):** Dockerfile now builds OpenCV 4.10.0 + contrib from source (`WITH_CUDA`, `CUDA_ARCH_BIN=12.0`, dnn/cudacodec off). Log: `/tmp/photo_slam_build.log`.
-- **P0 chained:** `scripts/schedule_photo_slam_p0.sh` waits for image → `wait_gpu.sh` (GPU-1) → `run_photo_slam_p0.sh`. Log: `/tmp/photo_slam_p0_schedule.log`; result: `runs/photo_slam_p0_fr1_desk/p0_summary.json`.
+- Fix: Dockerfile builds OpenCV 4.10.0 + contrib from source (`WITH_CUDA`, `CUDA_ARCH_BIN=12.0`, dnn/cudacodec off).
+- Build 3 died on a transient GitHub clone error → clone now retried 5×.
+- Builds 4–5: libtorch 2.7 API drift, patched via sed in Dockerfile:
+  - `c10::guts::to_string(param.unsafeGetTensorImpl())` → raw pointer (Adam state map is keyed by `void*` in torch 2.x; `std::to_string` would compile but break optimizer state lookup).
+  - examples: `c10Alloc::Stat*` → `c10::CachingAllocator::Stat*`.
+- **Image built (2026-09-28):** `harness/photo_slam:x86` (~17.8 GB).
+- **P0 queued:** scheduler waiting on GPU-1 (`wait_gpu.sh`: ≥40 GiB free, ≤5% util ×3). GPU-1 has ~86 GiB free but another job keeps it at ~40–80% util, so P0 waits until that job idles. Log: `/tmp/photo_slam_p0_schedule.log`; result: `runs/photo_slam_p0_fr1_desk/p0_summary.json`.
+- Script fixes: scheduler's build-alive check anchored to the real buildx process (was matching the launching shell); `wait_gpu.sh` CSV parsing fixed (was reading `free,util` as one value → never ready).
 
 ## Recent changes (2026-09-23)
 
@@ -49,7 +55,7 @@ In-family with published ORB-SLAM3 RGB-D fr1/desk (~1–2 cm).
 ## Next steps
 
 1. ~~Optional: run full smoke matrix (corrupted cells)~~ **Done 2026-09-24** — see progress.md.
-2. Phase-0 Photo-SLAM — **in progress** (build 3 + chained P0 on GPU-1); check logs above, compare ATE to paper fr1/desk.
+2. Phase-0 Photo-SLAM — **image built; P0 queued on GPU-1**; check logs above, compare ATE to paper fr1/desk.
 3. Decide Jetson + power gear → L4T + tegrastats.
 4. Broader dataset acquisition (Replica / EuRoC / TartanAir) with disk budget.
 

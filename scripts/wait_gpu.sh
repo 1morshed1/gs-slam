@@ -13,9 +13,8 @@ LOG="${LOG:-/tmp/wait_gpu${GPU_INDEX}.log}"
 ok=0
 echo "$(date -Is) waiting on GPU-${GPU_INDEX}: free>=${MIN_FREE_MIB}MiB util<=${MAX_UTIL}% x${STABLE}" | tee -a "$LOG"
 while true; do
-  read -r free util < <(nvidia-smi -i "$GPU_INDEX" \
-    --query-gpu=memory.free,utilization.gpu --format=csv,noheader,nounits \
-    | tr -d ' ')
+  IFS=', ' read -r free util < <(nvidia-smi -i "$GPU_INDEX" \
+    --query-gpu=memory.free,utilization.gpu --format=csv,noheader,nounits)
   echo "$(date -Is) GPU-${GPU_INDEX} free=${free}MiB util=${util}%" | tee -a "$LOG"
   if (( free >= MIN_FREE_MIB && util <= MAX_UTIL )); then
     ok=$((ok + 1))

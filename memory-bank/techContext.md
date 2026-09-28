@@ -47,7 +47,7 @@ python -m harness.orchestrator.run --config harness/orchestrator/configs/smoke.y
 
 ORB image: `harness/orb_slam3:x86` @ `4452a3c4…`. Host OPA blocks `-v`; adapter uses docker cp/exec + detached `rgbd_tum`.
 
-Photo-SLAM image: `harness/photo_slam:x86` @ `f8bfb2f0…` — CUDA 12.8.1 devel, torch 2.7.1 cu128, OpenCV 4.10.0 + contrib (CUDA, `sm_120`) from source, arch list patched to `75;86;120`.
+Photo-SLAM image: `harness/photo_slam:x86` @ `f8bfb2f0…` — CUDA 12.8.1 devel, torch 2.7.1 cu128, OpenCV 4.10.0 + contrib (CUDA, `sm_120`) from source, arch list patched to `75;86;120`, sed patches for libtorch 2.7 API (optimizer state keys, allocator `Stat` namespace). Built 2026-09-28, ~17.8 GB.
 
 ## Datasets
 

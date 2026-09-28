@@ -49,7 +49,10 @@ RUN pip3 install --no-cache-dir --upgrade pip \
 
 ARG PHOTO_SLAM_COMMIT=f8bfb2f0809c003ccc3fd577dc43c576fcafa4ac
 WORKDIR /opt
-RUN git clone --recursive https://github.com/HuajianUP/Photo-SLAM.git Photo-SLAM \
+RUN for i in 1 2 3 4 5; do \
+        git clone --recursive https://github.com/HuajianUP/Photo-SLAM.git Photo-SLAM && break; \
+        rm -rf Photo-SLAM; sleep 30; \
+    done \
     && cd Photo-SLAM \
     && git checkout "${PHOTO_SLAM_COMMIT}" \
     && git submodule update --init --recursive \
@@ -57,6 +60,11 @@ RUN git clone --recursive https://github.com/HuajianUP/Photo-SLAM.git Photo-SLAM
     && sed -i 's/CUDA_ARCHITECTURES "75;86"/CUDA_ARCHITECTURES "75;86;120"/' CMakeLists.txt \
     # Newer CUDA/torch: FLT_MAX needs <cfloat> in simple-knn
     && sed -i '1i #include <cfloat>' third_party/simple-knn/simple_knn.cu \
+    # libtorch >=2.x keys optimizer state by void* TensorImpl, not string (c10::guts::to_string removed)
+    && sed -i 's/c10::guts::to_string(\(param\.unsafeGetTensorImpl()\))/\1/g' src/gaussian_model.cpp \
+    && ! grep -q 'c10::guts::to_string' src/gaussian_model.cpp \
+    # libtorch >=2.x moved allocator Stat/StatType to c10::CachingAllocator
+    && sed -i 's/c10Alloc::Stat/c10::CachingAllocator::Stat/g' examples/*.cpp \
     && chmod +x build.sh
 
 # Build thirdparty + ORB-SLAM3 + Photo-SLAM against pip torch

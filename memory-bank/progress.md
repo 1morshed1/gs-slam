@@ -14,14 +14,14 @@
 | Orchestrator | Matrix + `_build_stream` + clean cells store ATE |
 | Store | Manifest + sqlite with accuracy columns populated |
 | Tests | `tests/test_scaffold.py` — 6 passed |
-| Containers | **`harness/orb_slam3:x86` built**; `harness/photo_slam:x86` building (OpenCV-CUDA from source); L4T deferred |
+| Containers | **`harness/orb_slam3:x86` built**; **`harness/photo_slam:x86` built** (OpenCV-CUDA from source + libtorch 2.7 patches); L4T deferred |
 | Analysis notebooks | README only |
 
 ## Phase status
 
 | Phase | Goal | State |
 |---|---|---|
-| **P0** Bring-up | Reproduce headline on ≥1 sequence | **ORB-SLAM3 on rig: PASS** (ATE ~1.7–2.3 cm fr1/desk). Photo-SLAM: image build 3 + chained P0 on GPU-1 in progress. Jetson TBD. |
+| **P0** Bring-up | Reproduce headline on ≥1 sequence | **ORB-SLAM3 on rig: PASS** (ATE ~1.7–2.3 cm fr1/desk). Photo-SLAM: image built; P0 queued on GPU-1 (waiting for idle). Jetson TBD. |
 | **P1** Measurement infra | Power sync, idle baselines | Partial (rig GPU backend only) |
 | **P2** Clean baseline | Uncorrupted grid → Pareto | Unblocked for ORB only |
 | **P3** Robustness sweep | Perturbation × severity | **Smoke grid done** (noise/jpeg/defocus × sev{1,3,5} × 2); generators ready for full suite |
