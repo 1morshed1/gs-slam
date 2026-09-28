@@ -21,7 +21,7 @@
 
 | Phase | Goal | State |
 |---|---|---|
-| **P0** Bring-up | Reproduce headline on ≥1 sequence | **ORB-SLAM3 on rig: PASS** (ATE ~1.7–2.3 cm fr1/desk). Photo-SLAM: first run ok on GPU-1, **PASS recommended** — idle GPU-1 ×11: median ATE ~1.6 cm (paper desktop 2.60 cm), good-mode PSNR ~21.8–22.0 dB (paper 20.87); 2/11 runs hit inherited ORB-SLAM3 tracker failure at t≈9 s (stock ORB-SLAM3: 4/10). Jetson TBD. |
+| **P0** Bring-up | Reproduce headline on ≥1 sequence | **ORB-SLAM3 on rig: PASS** (ATE ~1.7–2.3 cm fr1/desk). Photo-SLAM: first run ok on GPU-1, **PASS (confirmed 2026-09-28)** — idle GPU-1 ×11: median ATE ~1.6 cm (paper desktop 2.60 cm), good-mode PSNR ~21.8–22.0 dB (paper 20.87); 2/11 runs hit inherited ORB-SLAM3 tracker failure at t≈9 s (stock ORB-SLAM3: 4/10). Jetson TBD. |
 | **P1** Measurement infra | Power sync, idle baselines | Partial (rig GPU backend only) |
 | **P2** Clean baseline | Uncorrupted grid → Pareto | Unblocked for ORB only |
 | **P3** Robustness sweep | Perturbation × severity | **Smoke grid done** (noise/jpeg/defocus × sev{1,3,5} × 2); generators ready for full suite |

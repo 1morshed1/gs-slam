@@ -46,7 +46,7 @@
   - Photo-SLAM ×8 idle (`runs/investigate_bimodal/photo_slam/`): 1/8 fail at t≈9.2 s (3.98 cm); good 1.46–1.72 cm. With first batch: **2/11 idle runs fail (~18%)** vs ORB 4/10.
   - Tracking time identical in good/bad runs; no loop closures/resets; bad runs insert more KFs (~160 vs ~110) as a consequence. Only tracker-config difference vs stock: `nFeatures` 1200 (Photo-SLAM) vs 1000 (ORB) — plausible reason Photo-SLAM fails less, untested.
   - Contention still halves mapper iterations (2381 vs ~4700) → keep GS runs on idle GPU for quality/energy.
-- **Photo-SLAM P0 = PASS (recommended, awaiting user confirmation)**: idle median ATE ~1.6 cm, good-mode PSNR ~21.8–22.0 dB vs paper desktop 2.60 cm / 20.87 dB; failure mode is the shared ORB tracker's, documented.
+- **Photo-SLAM P0 = PASS (user confirmed 2026-09-28)**: idle median ATE ~1.6 cm, good-mode PSNR ~21.8–22.0 dB vs paper desktop 2.60 cm / 20.87 dB; failure mode is the shared ORB tracker's, documented.
 - **Benchmark implication:** clean fr1/desk is itself multi-modal for ORB-family trackers → 2 repeats per cell (smoke grid) is underpowered; report median + failure rate over ≥5–10 repeats. Revisit smoke conclusions (e.g. jpeg sev3 2.47 cm, noise sev5 1.27 m) in that light. ORB-SLAM3 P0 "~1.7–2.3 cm" came from lucky/good-mode runs; true clean distribution: median ~1.8 cm, ~30–40% degraded.
 - Script fixes: scheduler's build-alive check anchored to the real buildx process (was matching the launching shell); `wait_gpu.sh` CSV parsing fixed (was reading `free,util` as one value → never ready).
 
@@ -81,7 +81,7 @@ In-family with published ORB-SLAM3 RGB-D fr1/desk (~1–2 cm).
 ## Next steps
 
 1. ~~Optional: run full smoke matrix (corrupted cells)~~ **Done 2026-09-24** — see progress.md.
-2. Phase-0 Photo-SLAM — **first run ok but ATE 6.3 cm** vs paper desktop 2.6 cm / 20.9 dB: **P0 PASS recommended** (median 1.6 cm vs paper 2.6 cm); failure at t≈9 s is inherited ORB-SLAM3 tracker nondeterminism (Photo-SLAM 2/11, ORB 4/10). Still verify PSNR protocol. Next: raise repeats per cell for the grid.
+2. Phase-0 Photo-SLAM — **first run ok but ATE 6.3 cm** vs paper desktop 2.6 cm / 20.9 dB: **P0 PASS (confirmed)** (median 1.6 cm vs paper 2.6 cm); failure at t≈9 s is inherited ORB-SLAM3 tracker nondeterminism (Photo-SLAM 2/11, ORB 4/10). Still verify PSNR protocol. Next: raise repeats per cell for the grid.
 3. Decide Jetson + power gear → L4T + tegrastats.
 4. Broader dataset acquisition (Replica / EuRoC / TartanAir) with disk budget.
 
