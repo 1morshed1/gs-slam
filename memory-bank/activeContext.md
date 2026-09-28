@@ -29,9 +29,19 @@
   - Output: `runs/photo_slam_p0_fr1_desk/contended_r0/`.
 - **Paper targets** (arXiv 2311.16728 Table 2, RGB-D fr1-desk, ATE cm / PSNR dB): desktop RTX 4090 **2.603 / 20.870**; laptop 3080Ti 1.891 / 20.403; Jetson AGX Orin 4.571 / 18.273. Our 6.26 / ~18.1 sits at/below the Jetson row.
 - **Mapper shutdown is by design, not a harness bug:** `tum_rgbd` feeds frames at real-time (sleeps to timestamps); after `Shutdown()` the mapper trains only `n_delay_iters` more, then saves (`gaussian_mapper.cpp` ~518–538). Paper numbers use this same online protocol → do NOT extend training to "fix" PSNR; that would diverge from the paper.
-- Implication: Photo-SLAM accuracy/quality is **compute-coupled** (fixed real-time window → iterations depend on GPU throughput; paper's Jetson row is worse on both ATE and PSNR). A contended GPU-1 is therefore NOT neutral for Photo-SLAM P0. Re-run P0 with GPU-1 idle before judging; record iteration count per run.
 - Protocol caveat: our PSNR is Photo-SLAM's keyframe `psnr.txt`; confirm it matches the paper's eval protocol before comparing.
-- **Idle-GPU repeats (queued 2026-09-28):** `run_photo_slam_p0.sh` now runs `REPEATS` (default 3) into `runs/photo_slam_p0_fr1_desk/r{i}/`, each gated on `wait_gpu.sh` (≤5% util), and records `mapper_iterations`, `keyframe_psnr_mean`, `gpu1_at_start` in `p0_summary.json`.
+- `run_photo_slam_p0.sh` runs `REPEATS` (default 3) into `runs/photo_slam_p0_fr1_desk/r{i}/`, each gated on `wait_gpu.sh` (≤5% util), recording `mapper_iterations`, `keyframe_psnr_mean`, `gpu1_at_start` in `p0_summary.json`.
+- **Idle-GPU repeats (2026-09-28, GPU-1 0% util):**
+
+  | Run | ATE (cm) | KF PSNR (dB) | Mapper iters | KFs |
+  |---|---|---|---|---|
+  | r0 | 1.62 | 21.95 | 4881 | 112 |
+  | r1 | 1.63 | 21.77 | 4585 | 109 |
+  | r2 | 6.07 | 18.12 | 4681 | 161 |
+  | contended_r0 (45% util) | 6.26 | 18.10 | 2381 | 158 |
+
+- **Finding: bimodal tracking outcome, not compute starvation.** Both bad runs share one signature: a tracking jump at t≈5.7 s (fast-motion segment of fr1/desk), error peaks right after, partial recovery, ~160 KFs vs ~110. No loop closures/resets in any run. Contention halves mapper iterations (2381 vs ~4700) but the 6 cm / 18 dB result occurs on an idle GPU too. Earlier "compute-coupled accuracy" hypothesis was wrong for ATE.
+- Good-mode runs beat the paper desktop row (2.60 cm / 20.87 dB). P0 verdict pending user decision: pass-with-known-failure-mode vs. more repeats to estimate the bad-mode rate.
 - Script fixes: scheduler's build-alive check anchored to the real buildx process (was matching the launching shell); `wait_gpu.sh` CSV parsing fixed (was reading `free,util` as one value → never ready).
 
 ## Recent changes (2026-09-23)
@@ -65,7 +75,7 @@ In-family with published ORB-SLAM3 RGB-D fr1/desk (~1–2 cm).
 ## Next steps
 
 1. ~~Optional: run full smoke matrix (corrupted cells)~~ **Done 2026-09-24** — see progress.md.
-2. Phase-0 Photo-SLAM — **first run ok but ATE 6.3 cm** vs paper desktop 2.6 cm / 20.9 dB: re-run on idle GPU-1 with ≥3 repeats (per-repeat output dirs), log mapper iterations, verify PSNR protocol, then verdict.
+2. Phase-0 Photo-SLAM — **first run ok but ATE 6.3 cm** vs paper desktop 2.6 cm / 20.9 dB: idle repeats done — 2/3 beat paper (1.6 cm / 21.9 dB), 1/3 hits a bimodal failure at t≈5.7 s. Decide verdict / more repeats; verify PSNR protocol.
 3. Decide Jetson + power gear → L4T + tegrastats.
 4. Broader dataset acquisition (Replica / EuRoC / TartanAir) with disk budget.
 

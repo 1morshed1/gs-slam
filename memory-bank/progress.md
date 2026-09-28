@@ -21,7 +21,7 @@
 
 | Phase | Goal | State |
 |---|---|---|
-| **P0** Bring-up | Reproduce headline on ≥1 sequence | **ORB-SLAM3 on rig: PASS** (ATE ~1.7–2.3 cm fr1/desk). Photo-SLAM: first run ok on GPU-1, ATE 6.3 cm / PSNR ~18.1 dB on contended GPU (paper desktop 2.6 cm / 20.9 dB); idle-GPU repeats queued. Jetson TBD. |
+| **P0** Bring-up | Reproduce headline on ≥1 sequence | **ORB-SLAM3 on rig: PASS** (ATE ~1.7–2.3 cm fr1/desk). Photo-SLAM: first run ok on GPU-1, idle GPU-1 ×3: 1.62/1.63/6.07 cm, PSNR 21.95/21.77/18.12 dB (paper desktop 2.60 cm / 20.87 dB) — bimodal failure at t≈5.7 s in 1/3; verdict pending. Jetson TBD. |
 | **P1** Measurement infra | Power sync, idle baselines | Partial (rig GPU backend only) |
 | **P2** Clean baseline | Uncorrupted grid → Pareto | Unblocked for ORB only |
 | **P3** Robustness sweep | Perturbation × severity | **Smoke grid done** (noise/jpeg/defocus × sev{1,3,5} × 2); generators ready for full suite |
