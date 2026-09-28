@@ -21,7 +21,7 @@
 
 | Phase | Goal | State |
 |---|---|---|
-| **P0** Bring-up | Reproduce headline on ≥1 sequence | **ORB-SLAM3 on rig: PASS** (ATE ~1.7–2.3 cm fr1/desk). Photo-SLAM: first run ok on GPU-1, idle GPU-1 ×3: 1.62/1.63/6.07 cm, PSNR 21.95/21.77/18.12 dB (paper desktop 2.60 cm / 20.87 dB) — bimodal failure at t≈5.7 s in 1/3; verdict pending. Jetson TBD. |
+| **P0** Bring-up | Reproduce headline on ≥1 sequence | **ORB-SLAM3 on rig: PASS** (ATE ~1.7–2.3 cm fr1/desk). Photo-SLAM: first run ok on GPU-1, **PASS recommended** — idle GPU-1 ×11: median ATE ~1.6 cm (paper desktop 2.60 cm), good-mode PSNR ~21.8–22.0 dB (paper 20.87); 2/11 runs hit inherited ORB-SLAM3 tracker failure at t≈9 s (stock ORB-SLAM3: 4/10). Jetson TBD. |
 | **P1** Measurement infra | Power sync, idle baselines | Partial (rig GPU backend only) |
 | **P2** Clean baseline | Uncorrupted grid → Pareto | Unblocked for ORB only |
 | **P3** Robustness sweep | Perturbation × severity | **Smoke grid done** (noise/jpeg/defocus × sev{1,3,5} × 2); generators ready for full suite |
@@ -50,6 +50,7 @@ Takeaway: pipeline handles corruption end-to-end; sev5 can induce failure or ATE
 - GPU-1 is shared with other jobs; P0 waits for ≥40 GiB free + ≤5% util.
 - Analysis notebooks not created.
 - Detached ORB path: no-traj now labeled `lost_track` (was mis-tagged `crash` for defocus sev5).
+- Clean fr1/desk is multi-modal for ORB-family trackers (fast rotation at t≈9 s): 2 repeats/cell is underpowered — need ≥5–10 and median + failure-rate reporting.
 
 ## Verification (2026-09-23)
 
