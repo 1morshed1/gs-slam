@@ -4,6 +4,16 @@
 
 **Phase-0 Photo-SLAM bring-up in progress.** ORB-SLAM3 P0 + smoke already passed.
 
+## Outcome taxonomy locked (2026-09-30)
+
+Three buckets (plan §7), applied uniformly to all systems: **converged** (`ok` ∧ ATE ≤ τ),
+**diverged/catastrophic** (`ok` ∧ ATE > τ, default τ=0.5 m), **hard-fail** (`outcome != ok`).
+Derived at analysis time — stored `outcome` is never mutated. Failure rate =
+`catastrophic_rate = (diverged + hard)/n`; ATE stats over converged only, diverged reported
+separately. τ pre-registered + sensitivity-checked (`summarize --sensitivity`), stable across
+[0.1,1.0] m for bimodal cells. Code: `summarize.py`; test: `test_summarize_outcome_taxonomy`.
+Reframes gaussian-noise sev5 as **40% catastrophic**, not a 3.37 cm median.
+
 ## GPU policy (2026-09-27)
 
 **Always use GPU-1** (user directive). Do not use GPU-2 (or GPU-0).

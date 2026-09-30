@@ -145,3 +145,31 @@ def test_summarize_median_and_fail_rate(tmp_path):
     assert s["n"] == 4 and s["n_fail"] == 1 and abs(s["fail_rate"] - 0.25) < 1e-9
     assert abs(s["ate_median"] - 0.02) < 1e-9       # median ignores the failed run
     assert abs(s["ate_max"] - 0.09) < 1e-9
+
+
+def test_summarize_outcome_taxonomy(tmp_path):
+    """converged / diverged / hard-fail split + threshold sensitivity (plan §7)."""
+    from harness.store.db import ResultStore
+    from harness.store.summarize import summarize
+
+    store = ResultStore(tmp_path / "r.sqlite")
+    base = dict(system="orb_slam3", dataset="tum", sequence="s", modality="rgbd",
+                corruption="gaussian-noise", severity=5, power_mode="default",
+                hardware_tier="office_rig")
+    # 6 converged (~2-3.6 cm), 4 diverged (~125 cm, still "ok"), 0 hard failures —
+    # the real bimodal gaussian-noise sev5 shape.
+    ates = [0.020, 0.021, 0.030, 0.033, 0.035, 0.036, 1.25, 1.26, 1.27, 1.28]
+    for r, ate in enumerate(ates):
+        store.upsert(f"k{r}", dict(base, run_id=f"id{r}", repeat=r, outcome="ok", ate_rmse=ate))
+
+    (s,) = summarize(store.db_path, catastrophic_ate_m=0.5)
+    assert s["n"] == 10 and s["n_converged"] == 6 and s["n_diverged"] == 4
+    assert s["n_hard_fail"] == 0 and s["fail_rate"] == 0.0
+    assert abs(s["catastrophic_rate"] - 0.4) < 1e-9  # diverged counted as failure
+    assert s["ate_max"] <= 0.5                        # stats over converged only
+    assert abs(s["div_median"] - 1.265) < 1e-9
+
+    # Bimodal gap → split is stable across any threshold between the modes.
+    for thr in (0.1, 0.25, 0.5, 1.0):
+        (s,) = summarize(store.db_path, catastrophic_ate_m=thr)
+        assert abs(s["catastrophic_rate"] - 0.4) < 1e-9

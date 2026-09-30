@@ -128,6 +128,38 @@ Model this on **ImageNet-C-style severity levels** so every perturbation is *par
 - **ATE-RMSE** (aligned trajectory error), **RPE** (translational/rotational drift) — via `evo`.
 - **Failure/lost-track rate**: fraction of frames with no valid pose; define a lost-track detector (e.g., tracker reports failure or ATE spike beyond threshold).
 
+**Outcome taxonomy (applied uniformly to every system — fairness contract).**
+A run's stored `outcome` records what happened *mechanically* (see orchestrator
+`RunOutcome`: `ok` / `lost_track` / `timeout` / `crash` / `oom` / `infeasible`).
+For scoring, each run is then placed in one of three **derived** buckets at
+analysis time — never by mutating the stored outcome:
+
+| Bucket | Definition | Meaning |
+|---|---|---|
+| **converged** | `outcome == ok` **and** ATE-RMSE ≤ τ | usable trajectory |
+| **diverged** (catastrophic) | `outcome == ok` **and** ATE-RMSE > τ | finished but produced a garbage trajectory |
+| **hard-fail** | `outcome != ok` | lost track / timed out / crashed / OOM / infeasible |
+
+- **Why three, not two.** A run that emits a metres-off trajectory has failed by
+  any SLAM-relevant meaning, so it must not be scored as a success merely because
+  a file was written; but "produced garbage" and "cleanly stopped" are distinct
+  behaviours (and, across families, a distinct *finding*), so they stay separate
+  rather than collapsed into `lost_track`.
+- **Per-cell failure rate** = `catastrophic_rate = (n_diverged + n_hard_fail) / n`.
+  Report it alongside the **median ATE of converged runs** and the **diverged
+  count + median** — never a single mean, which for a bimodal cell describes
+  neither mode (e.g. gaussian-noise sev5 on fr1/desk: 6/10 at ~3 cm, 4/10 at
+  ~125 cm; mean 52 ± 64 cm is meaningless).
+- **Threshold τ is a reported, pre-registered parameter**, not tuned to a result.
+  Default **τ = 0.5 m** (room-scale sequences): far past any plausible good-mode
+  error, well below the observed failure mode. Because catastrophic cells are
+  bimodal with a wide gap, the split is **insensitive to τ across [0.1, 1.0] m** —
+  report the sensitivity table (`summarize --sensitivity`) so this is auditable.
+  Use a scale-appropriate τ (and state it) for larger environments.
+- Implemented in `harness/store/summarize.py` (`CATASTROPHIC_ATE_M`, `summarize`,
+  `sensitivity`); repeats ≥ 5–10 per cell are mandatory because ORB-family
+  trackers are multi-modal even on clean data.
+
 **Map/render quality (only for methods that render — GS, some GFM):**
 - **PSNR / SSIM / LPIPS** on held-out views; **reconstruction error** vs. GT mesh where available (Replica). Reported *separately* — never mixed into the cross-family pose ranking.
 

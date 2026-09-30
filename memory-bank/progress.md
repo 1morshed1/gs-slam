@@ -61,7 +61,14 @@ Same grid, 10 repeats/cell (100 runs). `python -m harness.store.summarize`. ATE 
 - Sev1–3 medians are indistinguishable from clean (1.7–1.9 cm); the ×2 "jpeg sev3 = 2.47 cm" was clean-baseline tracker variance, not a corruption effect.
 - gaussian-noise sev5 is **bimodal**: 6/10 at 2.0–3.6 cm, **4/10 at ~125 cm** (a consistent catastrophic mode, outcome still `ok`). Mean ± std is meaningless here → median + mode/failure counts.
 - defocus-blur sev5 is a deterministic failure (10/10 `lost_track`).
-- Open: classify `ok`-but-catastrophic (e.g. ATE > 0.5 m) as a failure category?
+- **Resolved (2026-09-30): three-bucket outcome taxonomy** (plan §7). `ok`-but-catastrophic
+  (ATE > τ, default 0.5 m) is now a **diverged** bucket, distinct from `converged` and
+  `hard-fail`. Per-cell failure rate = `catastrophic_rate = (diverged + hard) / n`; ATE
+  stats reported over converged runs only, diverged mode reported separately. So
+  gaussian-noise sev5 reads as **40% catastrophic** (4/10 diverged), not a benign
+  3.37 cm median. Stored `outcome` unchanged (still `ok`) — the split is analysis-time.
+  `summarize.py` gains `--catastrophic-m` + `--sensitivity`; τ is insensitive across
+  [0.1, 1.0] m given the bimodal gap. New test `test_summarize_outcome_taxonomy`.
 
 ## Known issues / blockers
 
