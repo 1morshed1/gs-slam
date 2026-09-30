@@ -81,7 +81,7 @@ In-family with published ORB-SLAM3 RGB-D fr1/desk (~1–2 cm).
 ## Next steps
 
 1. ~~Optional: run full smoke matrix (corrupted cells)~~ **Done 2026-09-24** — see progress.md.
-2. Phase-0 Photo-SLAM — **first run ok but ATE 6.3 cm** vs paper desktop 2.6 cm / 20.9 dB: **P0 PASS (confirmed)** (median 1.6 cm vs paper 2.6 cm); failure at t≈9 s is inherited ORB-SLAM3 tracker nondeterminism (Photo-SLAM 2/11, ORB 4/10). Still verify PSNR protocol. Next: raise repeats per cell for the grid.
+2. Phase-0 Photo-SLAM — **first run ok but ATE 6.3 cm** vs paper desktop 2.6 cm / 20.9 dB: **P0 PASS (confirmed)** (median 1.6 cm vs paper 2.6 cm); failure at t≈9 s is inherited ORB-SLAM3 tracker nondeterminism (Photo-SLAM 2/11, ORB 4/10). Still verify PSNR protocol. Repeats ×10 smoke grid done 2026-09-29 (see progress.md).
 3. Decide Jetson + power gear → L4T + tegrastats.
 4. Broader dataset acquisition (Replica / EuRoC / TartanAir) with disk budget.
 
